@@ -26,3 +26,16 @@ impl Card {
     }
   }
 }
+
+#[test]
+fn test_card_creation() {
+  let card = Card::from_goldfish_line("4 Winding Constrictor").unwrap();
+  assert_eq!(card.name, "Winding Constrictor");
+  assert_eq!(card.quantity, 4);
+}
+
+#[test]
+fn test_empty_card() {
+  let card = Card::from_goldfish_line("");
+  assert_eq!(card.is_none(), true);
+}
