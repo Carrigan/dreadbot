@@ -5,13 +5,6 @@ pub struct Card {
 }
 
 impl Card {
-  pub fn new(quantity: u8, name: String) -> Self {
-    Self{
-      quantity: quantity,
-      name: name
-    }
-  }
-
   pub fn from_goldfish_line(line: &str) -> Option<Self> {
     if line.is_empty() { return None }
 
