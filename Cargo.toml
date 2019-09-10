@@ -1,0 +1,9 @@
+[package]
+name = "dreadbot"
+version = "0.1.0"
+authors = ["Brian Carrigan <brian.c.carrigan@gmail.com>"]
+edition = "2018"
+
+
+[dependencies]
+reqwest = "0.9.20"
