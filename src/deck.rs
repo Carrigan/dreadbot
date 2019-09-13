@@ -1,4 +1,5 @@
-use super::card::{Card};
+use super::card::{Card, Cents};
+use super::scryfall::{ScryfallData};
 
 #[derive(Debug)]
 pub struct Deck {
@@ -26,6 +27,28 @@ impl Deck {
       goldfish_id: goldfish_id,
       mainboard: mainboard,
       sideboard: sideboard
+    }
+  }
+
+  fn update_card_pricing(card: &mut Card, entry: &ScryfallData) {
+    if card.name == entry.name {
+      if let Some(price) = &entry.prices.usd {
+        if let Ok(price_f32) = price.parse::<f32>() {
+          card.price = Some(Cents((price_f32 * 100f32) as u32))
+        }
+      }
+    }
+  }
+
+  pub fn update_pricing(&mut self, scryfall_entries: Vec<ScryfallData>) {
+    for entry in scryfall_entries {
+      for card in &mut self.mainboard {
+        Self::update_card_pricing(card, &entry);
+      }
+
+      for card in &mut self.sideboard {
+        Self::update_card_pricing(card, &entry);
+      }
     }
   }
 
@@ -89,4 +112,27 @@ fn test_iterator() {
   assert_eq!(deck_iter.next().unwrap().name, "Zombie Infestation");
   assert_eq!(deck_iter.next().unwrap().name, "Island");
   assert_eq!(deck_iter.next().is_none(), true);
+}
+
+#[test]
+fn test_pricing_update() {
+  let deck_text = "10 Island\r\n4 Treasure Hunt";
+  let id = "test id";
+  let mut deck = Deck::from_goldfish_block(String::from(id), String::from(deck_text));
+  let mut scryfall_entries: Vec<ScryfallData> = Vec::new();
+
+  scryfall_entries.push(ScryfallData {
+    name: String::from("Island"),
+    prices: super::scryfall::ScryfallPrices {
+      usd: Some(String::from("1.00"))
+    }
+  });
+
+  deck.update_pricing(scryfall_entries);
+
+  let island = deck.mainboard.get(0).unwrap();
+  assert_eq!(island.price, Some(Cents(100)));
+
+  let treasure_hunt = deck.mainboard.get(1).unwrap();
+  assert_eq!(treasure_hunt.price, None);
 }

@@ -1,7 +1,11 @@
+#[derive(Debug, PartialEq)]
+pub struct Cents(pub u32);
+
 #[derive(Debug)]
 pub struct Card {
-  pub quantity: u8,
-  pub name: String
+  pub quantity: u32,
+  pub name: String,
+  pub price: Option<Cents>
 }
 
 impl Card {
@@ -11,10 +15,10 @@ impl Card {
     let mut splitter = line.splitn(2, " ");
     let quantity_string = splitter.next().unwrap();
     let name_string = splitter.next().unwrap();
-    let quantity_parsed = quantity_string.parse::<u8>();
+    let quantity_parsed = quantity_string.parse::<u32>();
 
     match quantity_parsed {
-      Ok(quantity) => Some(Card { quantity: quantity, name: String::from(name_string) }),
+      Ok(quantity) => Some(Card { quantity: quantity, name: String::from(name_string), price: None }),
       Err(_) => None
     }
   }
