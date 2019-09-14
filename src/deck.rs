@@ -55,6 +55,27 @@ impl Deck {
   pub fn cards<'a>(&'a self) -> DeckIter<'a> {
     DeckIter { deck: self, index: 0 }
   }
+
+  fn sum_prices(cards: &Vec<Card>) -> Cents {
+    let mut total_cents: Cents = Cents(0);
+
+    for card in cards {
+      total_cents = match &card.price {
+        Some(amount) => Cents(total_cents.0 + card.quantity * amount.0),
+        None => total_cents
+      };
+    }
+
+    total_cents
+  }
+
+  pub fn mainboard_pricing(&self) -> Cents {
+    Deck::sum_prices(&self.mainboard)
+  }
+
+  pub fn sideboard_pricing(&self) -> Cents {
+    Deck::sum_prices(&self.sideboard)
+  }
 }
 
 pub struct DeckIter<'a> {
@@ -135,4 +156,34 @@ fn test_pricing_update() {
 
   let treasure_hunt = deck.mainboard.get(1).unwrap();
   assert_eq!(treasure_hunt.price, None);
+}
+
+#[test]
+fn test_mainboard_pricing() {
+  let mut cards: Vec<Card> = Vec::new();
+  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(Cents(100)) });
+  cards.push(Card { quantity: 1, name: String::from("Island"), price: None });
+
+  let deck = Deck {
+    mainboard: cards,
+    sideboard: Vec::new(),
+    goldfish_id: String::from("test")
+  };
+
+  assert_eq!(deck.mainboard_pricing(), Cents(1000));
+}
+
+#[test]
+fn test_sideboard_pricing() {
+  let mut cards: Vec<Card> = Vec::new();
+  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(Cents(100)) });
+  cards.push(Card { quantity: 1, name: String::from("Island"), price: None });
+
+  let deck = Deck {
+    mainboard: Vec::new(),
+    sideboard: cards,
+    goldfish_id: String::from("test")
+  };
+
+  assert_eq!(deck.sideboard_pricing(), Cents(1000));
 }

@@ -1,6 +1,15 @@
 #[derive(Debug, PartialEq)]
 pub struct Cents(pub u32);
 
+impl Cents {
+  pub fn format(&self) -> String {
+    let dollars = self.0 / 100;
+    let remainder = self.0 % 100;
+
+    format!("{}.{:02}", dollars, remainder)
+  }
+}
+
 #[derive(Debug)]
 pub struct Card {
   pub quantity: u32,
