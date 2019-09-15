@@ -76,6 +76,27 @@ impl Deck {
   pub fn sideboard_pricing(&self) -> Cents {
     Deck::sum_prices(&self.sideboard)
   }
+
+  pub fn info_string(&self) -> String {
+    let mut info = String::new();
+
+    info += "```\n";
+
+    info += "Mainboard:\n";
+    for card in &self.mainboard {
+      info += &card.info_string();
+      info += "\n";
+    }
+
+    info += "\nSideboard:\n";
+    for card in &self.sideboard {
+      info += &card.info_string();
+      info += "\n";
+    }
+
+    info += "```";
+    info
+  }
 }
 
 pub struct DeckIter<'a> {

@@ -31,6 +31,16 @@ impl Card {
       Err(_) => None
     }
   }
+
+  pub fn info_string(&self) -> String {
+    match &self.price {
+      Some(amount) => format!(
+        "{} {} ({} each, {} total)",
+        self.quantity, self.name, amount.format(), Cents(amount.0 * self.quantity).format()
+      ),
+      None => format!("{} {} (unpriced)", self.quantity, self.name)
+    }
+  }
 }
 
 #[test]

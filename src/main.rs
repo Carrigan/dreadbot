@@ -17,6 +17,19 @@ use serenity::{
 
 const MAINDECK_LIMIT: Cents = Cents(20_00);
 const SIDEBOARD_LIMIT: Cents = Cents(5_00);
+const DREADBOT_PREFIX: &str = r"^\$\$(.*)$";
+const HELP_TEXT: &str =
+r"
+```
+Dreadbot is the official pricing method of paper dreadful.
+
+Commands:
+$$help         - Display this message
+$$verify <url> - Verify a decklist
+$$info <url>   - Receive an itemized list of prices for a deck.
+                 The response is lengthy so try to keep this to PMs.
+```
+";
 
 struct Handler;
 
@@ -37,13 +50,15 @@ fn fetch_deck(id: &str) -> Option<Deck> {
     Some(deck)
 }
 
-fn respond(ctx: Context, msg: &Message, response: String) {
+fn respond(ctx: &Context, msg: &Message, response: &str) -> bool {
     if let Err(why) = msg.channel_id.say(&ctx.http, response) {
         println!("Error sending response: {:?}", why);
     }
+
+    true
 }
 
-fn respond_to_deck(ctx: Context, msg: &Message, deck: &Deck) {
+fn respond_to_deck(ctx: &Context, msg: &Message, deck: &Deck) -> bool {
     let maindeck_price = deck.mainboard_pricing();
     let sideboard_price = deck.sideboard_pricing();
     let formatted_maindeck = maindeck_price.format();
@@ -74,36 +89,70 @@ fn respond_to_deck(ctx: Context, msg: &Message, deck: &Deck) {
             )
     };
 
-    respond(ctx, &msg, response);
+    respond(ctx, &msg, &response)
+}
+
+fn retrieve_or_error(ctx: &Context, msg: &Message, regex: Regex, parsed_message: &str) -> Option<Deck> {
+    let captures = match regex.captures(parsed_message) {
+        Some(c) => c,
+        None => return None
+    };
+
+    let id = match captures.get(1) {
+        Some(c) => c.as_str(),
+        None => return None
+    };
+
+    let deck = fetch_deck(id);
+    if deck.is_none() {
+        let response = format!("Decklist with id {:?} is not accessible or private.", id);
+        respond(ctx, &msg, &response);
+    }
+
+    deck
+}
+
+fn dreadbot_help(ctx: &Context, msg: &Message) -> bool {
+    respond(ctx, &msg, HELP_TEXT)
+}
+
+fn dreadbot_verify(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
+    let regex =
+        Regex::new(r"^verify https://www\.mtggoldfish\.com/deck/(\d*).*$")
+            .unwrap();
+
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+        return respond_to_deck(ctx, &msg, &deck);
+    }
+
+    false
+}
+
+fn dreadbot_info(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
+    let regex =
+        Regex::new(r"^info https://www\.mtggoldfish\.com/deck/(\d*).*$")
+            .unwrap();
+
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+        return respond(ctx, &msg, &deck.info_string());
+    }
+
+    false
 }
 
 impl EventHandler for Handler {
     fn message(&self, ctx: Context, msg: Message) {
-        let regex =
-            Regex::new(r"^!dreadbot https://www\.mtggoldfish\.com/deck/(\d*).*$")
-            .unwrap();
+        let regex = Regex::new(DREADBOT_PREFIX).unwrap();
 
-        let captures = match regex.captures(&msg.content) {
-            Some(c) => c,
-            None => return
-        };
+        if let Some(captures) = regex.captures(&msg.content) {
+            if let Some(remaining_message) = captures.get(1) {
+                if dreadbot_verify(&ctx, &msg, remaining_message.as_str()) { return }
+                if dreadbot_info(&ctx, &msg, remaining_message.as_str()) { return }
 
-        let id = match captures.get(1) {
-            Some(c) => c.as_str(),
-            None => return
-        };
-
-        let deck = match fetch_deck(id) {
-            Some(d) => d,
-            None => {
-                let response = format!("Decklist with id {:?} is not accessible or private.", id);
-                respond(ctx, &msg, response);
-                return;
-            }
-        };
-
-
-        respond_to_deck(ctx, &msg, &deck);
+                // Fallback to the help message
+                dreadbot_help(&ctx, &msg);
+            };
+        }
     }
 
     fn ready(&self, _: Context, ready: Ready) {
