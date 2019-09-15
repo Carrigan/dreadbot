@@ -5,7 +5,7 @@ mod deck;
 mod card;
 mod scryfall;
 
-use card::{Cents};
+use card::{Cents, format_cents};
 use goldfish::{retrieve_deck};
 use deck::Deck;
 use regex::Regex;
@@ -15,8 +15,8 @@ use serenity::{
     prelude::*,
 };
 
-const MAINDECK_LIMIT: Cents = Cents(20_00);
-const SIDEBOARD_LIMIT: Cents = Cents(5_00);
+const MAINDECK_LIMIT: Cents = 20_00;
+const SIDEBOARD_LIMIT: Cents = 5_00;
 const DREADBOT_PREFIX: &str = r"^\$\$(.*)$";
 const HELP_TEXT: &str =
 r"
@@ -61,11 +61,11 @@ fn respond(ctx: &Context, msg: &Message, response: &str) -> bool {
 fn respond_to_deck(ctx: &Context, msg: &Message, deck: &Deck) -> bool {
     let maindeck_price = deck.mainboard_pricing();
     let sideboard_price = deck.sideboard_pricing();
-    let formatted_maindeck = maindeck_price.format();
-    let formatted_sideboard= sideboard_price.format();
+    let formatted_maindeck = format_cents(maindeck_price);
+    let formatted_sideboard= format_cents(sideboard_price);
 
-    let maindeck_over = deck.mainboard_pricing().0 <= MAINDECK_LIMIT.0;
-    let sideboard_over = deck.sideboard_pricing().0 <= SIDEBOARD_LIMIT.0;
+    let maindeck_over = deck.mainboard_pricing() <= MAINDECK_LIMIT;
+    let sideboard_over = deck.sideboard_pricing() <= SIDEBOARD_LIMIT;
     let response = match (maindeck_over, sideboard_over) {
         (true, true) =>
             format!(

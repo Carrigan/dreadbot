@@ -34,7 +34,7 @@ impl Deck {
     if card.name == entry.name {
       if let Some(price) = &entry.prices.usd {
         if let Ok(price_f32) = price.parse::<f32>() {
-          card.price = Some(Cents((price_f32 * 100f32) as u32))
+          card.price = Some((price_f32 * 100f32) as Cents)
         }
       }
     }
@@ -57,11 +57,11 @@ impl Deck {
   }
 
   fn sum_prices(cards: &Vec<Card>) -> Cents {
-    let mut total_cents: Cents = Cents(0);
+    let mut total_cents: Cents = 0;
 
     for card in cards {
       total_cents = match &card.price {
-        Some(amount) => Cents(total_cents.0 + card.quantity * amount.0),
+        Some(amount) => total_cents + card.quantity * *amount,
         None => total_cents
       };
     }
@@ -173,7 +173,7 @@ fn test_pricing_update() {
   deck.update_pricing(scryfall_entries);
 
   let island = deck.mainboard.get(0).unwrap();
-  assert_eq!(island.price, Some(Cents(100)));
+  assert_eq!(island.price, Some(100));
 
   let treasure_hunt = deck.mainboard.get(1).unwrap();
   assert_eq!(treasure_hunt.price, None);
@@ -182,7 +182,7 @@ fn test_pricing_update() {
 #[test]
 fn test_mainboard_pricing() {
   let mut cards: Vec<Card> = Vec::new();
-  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(Cents(100)) });
+  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(100) });
   cards.push(Card { quantity: 1, name: String::from("Island"), price: None });
 
   let deck = Deck {
@@ -191,13 +191,13 @@ fn test_mainboard_pricing() {
     goldfish_id: String::from("test")
   };
 
-  assert_eq!(deck.mainboard_pricing(), Cents(1000));
+  assert_eq!(deck.mainboard_pricing(), 1000);
 }
 
 #[test]
 fn test_sideboard_pricing() {
   let mut cards: Vec<Card> = Vec::new();
-  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(Cents(100)) });
+  cards.push(Card { quantity: 10, name: String::from("Island"), price: Some(100) });
   cards.push(Card { quantity: 1, name: String::from("Island"), price: None });
 
   let deck = Deck {
@@ -206,5 +206,5 @@ fn test_sideboard_pricing() {
     goldfish_id: String::from("test")
   };
 
-  assert_eq!(deck.sideboard_pricing(), Cents(1000));
+  assert_eq!(deck.sideboard_pricing(), 1000);
 }

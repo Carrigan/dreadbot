@@ -1,13 +1,10 @@
-#[derive(Debug, PartialEq)]
-pub struct Cents(pub u32);
+pub type Cents = u32;
 
-impl Cents {
-  pub fn format(&self) -> String {
-    let dollars = self.0 / 100;
-    let remainder = self.0 % 100;
+pub fn format_cents(amount: Cents) -> String {
+  let dollars = amount / 100;
+  let remainder = amount % 100;
 
-    format!("{}.{:02}", dollars, remainder)
-  }
+  format!("{}.{:02}", dollars, remainder)
 }
 
 #[derive(Debug)]
@@ -36,7 +33,7 @@ impl Card {
     match &self.price {
       Some(amount) => format!(
         "{} {} ({} each, {} total)",
-        self.quantity, self.name, amount.format(), Cents(amount.0 * self.quantity).format()
+        self.quantity, self.name, format_cents(*amount), format_cents(*amount * self.quantity)
       ),
       None => format!("{} {} (unpriced)", self.quantity, self.name)
     }
