@@ -46,7 +46,7 @@ fn fetch_deck(id: &str) -> Option<Deck> {
         _ => return None
     };
 
-    deck.update_pricing(scryfall_resp.data);
+    deck.update_pricing(scryfall_resp);
     Some(deck)
 }
 

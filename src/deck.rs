@@ -1,5 +1,5 @@
 use super::card::{Card, Cents};
-use super::scryfall::{ScryfallData};
+use super::scryfall::{PricingSource};
 
 #[derive(Debug)]
 pub struct Deck {
@@ -30,17 +30,13 @@ impl Deck {
     }
   }
 
-  fn update_card_pricing(card: &mut Card, entry: &ScryfallData) {
+  fn update_card_pricing(card: &mut Card, entry: &PricingSource) {
     if card.name == entry.name {
-      if let Some(price) = &entry.prices.usd {
-        if let Ok(price_f32) = price.parse::<f32>() {
-          card.price = Some((price_f32 * 100f32) as Cents)
-        }
-      }
+      card.price = Some(entry.price);
     }
   }
 
-  pub fn update_pricing(&mut self, scryfall_entries: Vec<ScryfallData>) {
+  pub fn update_pricing(&mut self, scryfall_entries: Vec<PricingSource>) {
     for entry in scryfall_entries {
       for card in &mut self.mainboard {
         Self::update_card_pricing(card, &entry);
@@ -161,13 +157,11 @@ fn test_pricing_update() {
   let deck_text = "10 Island\r\n4 Treasure Hunt";
   let id = "test id";
   let mut deck = Deck::from_goldfish_block(String::from(id), String::from(deck_text));
-  let mut scryfall_entries: Vec<ScryfallData> = Vec::new();
+  let mut scryfall_entries: Vec<PricingSource> = Vec::new();
 
-  scryfall_entries.push(ScryfallData {
+  scryfall_entries.push(PricingSource {
     name: String::from("Island"),
-    prices: super::scryfall::ScryfallPrices {
-      usd: Some(String::from("1.00"))
-    }
+    price: 100
   });
 
   deck.update_pricing(scryfall_entries);

@@ -1,17 +1,7 @@
 extern crate serde_derive;
-use serde::{Serialize, Deserialize};
-use super::card::Card;
+use serde::{Deserialize};
+use super::card::{Card, Cents};
 use super::deck::Deck;
-
-#[derive(Serialize, Debug)]
-struct ScryfallRequest {
-  identifiers: Vec<NameIdentifier>
-}
-
-#[derive(Serialize, Debug)]
-struct NameIdentifier {
-  name: String
-}
 
 #[derive(Deserialize, Debug)]
 pub struct ScryfallResponse {
@@ -29,27 +19,84 @@ pub struct ScryfallPrices {
   pub usd: Option<String>
 }
 
-fn card_to_name_identifier(card: &Card) -> NameIdentifier {
-  NameIdentifier { name: card.name.clone() }
+#[derive(Debug)]
+pub struct PricingSource {
+  pub name: String,
+  pub price: Cents
 }
 
-pub fn request_pricing(deck: &Deck) -> Result<ScryfallResponse, Box<dyn std::error::Error>> {
-  let uri = "https://api.scryfall.com/cards/collection";
-  let mut identifiers: Vec<NameIdentifier> = Vec::new();
+const BASIC_LAND_NAMES: &'static [&'static str] = &[
+  "Swamp",
+  "Island",
+  "Forest",
+  "Mountain",
+  "Plains"
+];
 
-  for card in deck.cards() {
-    identifiers.push(card_to_name_identifier(card));
+fn format_scryfall_param(card: &Card) -> String {
+  format!("!\"{}\"", card.name)
+}
+
+fn reduce_pricing(entries: Vec<ScryfallData>) -> Vec<PricingSource> {
+  let mut prices: Vec<PricingSource> = Vec::new();
+
+  for entry in entries {
+    let str_price = match &entry.prices.usd {
+      Some(price) => price,
+      None => continue
+    };
+
+    let price = match str_price.parse::<f32>() {
+      Ok(p32) => (p32 * 100f32) as Cents,
+      _ => continue
+    };
+
+    let previous_entry = prices.iter_mut().find(|ps| ps.name == entry.name);
+
+    // If it exists, update if the new price is lower
+    if let Some(previous_price) = previous_entry {
+      if price < previous_price.price {
+        previous_price.price = price;
+      }
+
+    // Otherwise add it
+    } else {
+      prices.push(PricingSource { name: entry.name, price: price });
+    }
   }
 
-  let request_body = ScryfallRequest { identifiers: identifiers };
-  let mut response = reqwest::Client::new()
-    .post(uri)
-    .json(&request_body)
-    .send()?;
+  prices
+}
 
-  let json = response.json()?;
+pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::error::Error>> {
+  let mut name_params = String::new();
+  let mut first_flag = true;
+  for card in deck.cards() {
+    // Advance the first flag if true
+    let is_first = first_flag;
+    first_flag = false;
 
-  Ok(json)
+    // If it is a basic, do not add it to the list. This returns hundreds of cards each
+    if let Some(_) = BASIC_LAND_NAMES.iter().find(|name| *name == &card.name) {
+      continue;
+    }
+
+    // Add to it
+    if !is_first { name_params += " OR "; }
+    name_params += &format_scryfall_param(card)
+  }
+
+  let query =
+    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital and ({})", name_params)
+      .replace(" ", "%20");
+
+  let response: ScryfallResponse =
+    reqwest::Client::new()
+      .get(&query)
+      .send()?
+      .json()?;
+
+  Ok(reduce_pricing(response.data))
 }
 
 #[test]
@@ -58,9 +105,28 @@ fn test_api_call() {
     let deck = Deck::from_goldfish_block(String::from("10108"), String::from(zombie_hunt));
 
     let scryfall_resp = request_pricing(&deck).unwrap();
-    for item in &scryfall_resp.data {
-        println!("{:?} costs {:?}", item.name, item.prices.usd.as_ref());
+    for item in &scryfall_resp {
+        println!("{:?} costs {:?}", item.name, item.price);
     }
 
-    assert_eq!(scryfall_resp.data.get(0).is_some(), true);
+    assert_eq!(scryfall_resp.get(0).is_some(), true);
+}
+
+#[test]
+fn test_request_pricing() {
+  let mut scryfall_mock: Vec<ScryfallData> = Vec::new();
+  scryfall_mock.push(ScryfallData{
+    name: String::from("Island"),
+    prices: ScryfallPrices { usd: Some(String::from("1.00")) }});
+  scryfall_mock.push(ScryfallData{
+    name: String::from("Island"),
+    prices: ScryfallPrices { usd: Some(String::from("0.50")) }});
+  scryfall_mock.push(ScryfallData{
+    name: String::from("Island"),
+    prices: ScryfallPrices { usd: Some(String::from("2.00")) }});
+
+  let reduced_prices = reduce_pricing(scryfall_mock);
+  assert_eq!(reduced_prices.len(), 1);
+  assert_eq!(reduced_prices.get(0).unwrap().name, "Island");
+  assert_eq!(reduced_prices.get(0).unwrap().price, 50 as Cents);
 }
