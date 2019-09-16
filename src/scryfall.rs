@@ -6,7 +6,7 @@ use super::deck::Deck;
 #[derive(Deserialize, Debug)]
 pub struct ScryfallResponse {
   pub data: Vec<ScryfallData>,
-  pub next_link: Option<String>
+  pub next_page: Option<String>
 }
 
 #[derive(Deserialize, Debug)]
@@ -87,13 +87,17 @@ pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::e
     name_params += &format_scryfall_param(card)
   }
 
+  // If there are no names, the query returns all cards. Thats bad! Return now.
+  if name_params.is_empty() { return Ok(Vec::new()); }
+
   // Start a list of ScryfallData in case there are multiple requests
   let mut data: Vec<ScryfallData> = Vec::new();
 
   // Build the initial query
   let query =
-    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital and ({})", name_params)
-      .replace(" ", "%20");
+    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital usd>0 ({})", name_params)
+      .replace(" ", "%20")
+      .replace("\"", "%22");
 
   // Send it and merge
   let mut response: ScryfallResponse =
@@ -105,7 +109,7 @@ pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::e
   data.append(&mut response.data);
 
   // Consume until there is no more
-  while let Some(next_url) = response.next_link {
+  while let Some(next_url) = response.next_page {
     response =
       reqwest::Client::new()
         .get(&next_url)
@@ -132,7 +136,7 @@ fn test_api_call() {
 }
 
 #[test]
-fn test_request_pricing() {
+fn test_reduce_pricing() {
   let mut scryfall_mock: Vec<ScryfallData> = Vec::new();
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
@@ -148,4 +152,18 @@ fn test_request_pricing() {
   assert_eq!(reduced_prices.len(), 1);
   assert_eq!(reduced_prices.get(0).unwrap().name, "Island");
   assert_eq!(reduced_prices.get(0).unwrap().price, 50 as Cents);
+}
+
+
+
+#[test]
+fn test_multiple_requests() {
+  let block: String = String::from("22 Air Elemental\r\n27 Counterspell\r\n28 Dark Ritual\r\n27 Disenchant\r\n21 Evolving Wilds\r\n25 Fireball\r\n34 Giant Growth\r\n25 Llanowar Elves\r\n21 Pacifism\r\n27 Serra Angel\r\n20 Shatter\r\n22 Shivan Dragon\r\n23 Stone Rain\r\n21 Swords to Plowshares\r\n21 Terror\r\n20 Unsummon");
+  let deck = Deck::from_goldfish_block(String::from("10108"), block);
+  println!("{:?}", deck);
+
+  let scryfall_resp = request_pricing(&deck).unwrap();
+  println!("{:?}", scryfall_resp);
+
+  assert_eq!(scryfall_resp.len(), 16);
 }
