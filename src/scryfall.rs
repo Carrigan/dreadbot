@@ -5,7 +5,8 @@ use super::deck::Deck;
 
 #[derive(Deserialize, Debug)]
 pub struct ScryfallResponse {
-  pub data: Vec<ScryfallData>
+  pub data: Vec<ScryfallData>,
+  pub next_link: Option<String>
 }
 
 #[derive(Deserialize, Debug)]
@@ -86,17 +87,35 @@ pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::e
     name_params += &format_scryfall_param(card)
   }
 
+  // Start a list of ScryfallData in case there are multiple requests
+  let mut data: Vec<ScryfallData> = Vec::new();
+
+  // Build the initial query
   let query =
     format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital and ({})", name_params)
       .replace(" ", "%20");
 
-  let response: ScryfallResponse =
+  // Send it and merge
+  let mut response: ScryfallResponse =
     reqwest::Client::new()
       .get(&query)
       .send()?
       .json()?;
 
-  Ok(reduce_pricing(response.data))
+  data.append(&mut response.data);
+
+  // Consume until there is no more
+  while let Some(next_url) = response.next_link {
+    response =
+      reqwest::Client::new()
+        .get(&next_url)
+        .send()?
+        .json()?;
+
+    data.append(&mut response.data);
+  }
+
+  Ok(reduce_pricing(data))
 }
 
 #[test]
