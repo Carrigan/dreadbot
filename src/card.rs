@@ -24,7 +24,11 @@ impl Card {
     let quantity_parsed = quantity_string.parse::<u32>();
 
     match quantity_parsed {
-      Ok(quantity) => Some(Card { quantity: quantity, name: String::from(name_string), price: None }),
+      Ok(quantity) => Some(Card {
+        quantity: quantity,
+        name: String::from(name_string).replace("/", " // "),
+        price: None
+      }),
       Err(_) => None
     }
   }
@@ -51,4 +55,11 @@ fn test_card_creation() {
 fn test_empty_card() {
   let card = Card::from_goldfish_line("");
   assert_eq!(card.is_none(), true);
+}
+
+#[test]
+fn test_parses_split_card() {
+  let card = Card::from_goldfish_line("4 Fire/Ice").unwrap();
+  assert_eq!(card.name, "Fire // Ice");
+  assert_eq!(card.quantity, 4);
 }
