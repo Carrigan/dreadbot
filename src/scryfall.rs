@@ -95,7 +95,7 @@ pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::e
 
   // Build the initial query
   let query =
-    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital usd>0 ({})", name_params)
+    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital -border:gold usd>0 ({})", name_params)
       .replace(" ", "%20")
       .replace("\"", "%22");
 
