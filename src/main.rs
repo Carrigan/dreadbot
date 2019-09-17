@@ -26,6 +26,7 @@ Dreadbot is the official pricing method of paper dreadful.
 Commands:
 $$help         - Display this message
 $$verify <url> - Verify a decklist
+$$hash <url>   - Check the hash of a decklist
 $$info <url>   - Receive an itemized list of prices for a deck.
                  The response is lengthy so try to keep this to PMs.
 ```
@@ -69,8 +70,8 @@ fn respond_to_deck(ctx: &Context, msg: &Message, deck: &Deck) -> bool {
     let response = match (maindeck_over, sideboard_over) {
         (true, true) =>
             format!(
-                ":white_check_mark: Deck accepted!\nMaindeck price: {}\nSideboard price: {}",
-                formatted_maindeck, formatted_sideboard
+                ":white_check_mark: Deck accepted!\nDeck hash: {}\nMaindeck price: {}\nSideboard price: {}",
+                deck.to_hash(), formatted_maindeck, formatted_sideboard
             ),
         (true, false) =>
             format!(
@@ -140,6 +141,18 @@ fn dreadbot_info(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
     false
 }
 
+fn dreadbot_hash(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
+    let regex =
+        Regex::new(r"^hash https://www\.mtggoldfish\.com/deck/(\d*).*$")
+            .unwrap();
+
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+        return respond(ctx, &msg, &format!("Deck hash: {}", &deck.to_hash()));
+    }
+
+    false
+}
+
 impl EventHandler for Handler {
     fn message(&self, ctx: Context, msg: Message) {
         let regex = Regex::new(DREADBOT_PREFIX).unwrap();
@@ -148,6 +161,7 @@ impl EventHandler for Handler {
             if let Some(remaining_message) = captures.get(1) {
                 if dreadbot_verify(&ctx, &msg, remaining_message.as_str()) { return }
                 if dreadbot_info(&ctx, &msg, remaining_message.as_str()) { return }
+                if dreadbot_hash(&ctx, &msg, remaining_message.as_str()) { return }
 
                 // Fallback to the help message
                 dreadbot_help(&ctx, &msg);

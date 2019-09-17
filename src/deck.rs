@@ -1,5 +1,6 @@
 use super::card::{Card, Cents};
 use super::scryfall::{PricingSource};
+use sha2::{Sha256, Digest};
 
 #[derive(Debug)]
 pub struct Deck {
@@ -22,6 +23,9 @@ impl Deck {
             None => sideboard_flag = true
         };
     }
+
+    mainboard.sort_by(|a, b| a.name.cmp(&b.name));
+    sideboard.sort_by(|a, b| a.name.cmp(&b.name));
 
     Deck {
       goldfish_id: goldfish_id,
@@ -93,6 +97,27 @@ impl Deck {
     info += "```";
     info
   }
+
+  pub fn to_hash(&self) -> String {
+    let mut hasher = Sha256::new();
+
+    for card in &self.mainboard {
+      hasher.input(format!("#{} {}", card.quantity, card.name));
+    }
+
+    hasher.input("||");
+
+    for card in &self.mainboard {
+      hasher.input(format!("#{} {}", card.quantity, card.name));
+    }
+
+    let mut hash_string = String::new();
+    for byte in hasher.result()[..6].iter() {
+      hash_string += &format!("{:02X}", byte);
+    }
+
+    hash_string
+  }
 }
 
 pub struct DeckIter<'a> {
@@ -130,8 +155,8 @@ fn test_deck_creation() {
 
   assert_eq!(deck.goldfish_id, String::from(id));
   assert_eq!(deck.mainboard.len(), 4);
-  assert_eq!(deck.mainboard.get(0).unwrap().quantity, 4);
-  assert_eq!(deck.mainboard.get(0).unwrap().name, "Treasure Hunt");
+  assert_eq!(deck.mainboard.get(0).unwrap().quantity, 26);
+  assert_eq!(deck.mainboard.get(0).unwrap().name, "Island");
 
   assert_eq!(deck.sideboard.len(), 1);
   assert_eq!(deck.sideboard.get(0).unwrap().quantity, 15);
@@ -201,4 +226,13 @@ fn test_sideboard_pricing() {
   };
 
   assert_eq!(deck.sideboard_pricing(), 1000);
+}
+
+#[test]
+fn test_to_hash() {
+  let deck_text = "10 Island\r\n4 Treasure Hunt\r\n4 Zombie Infestation\r\n\r\n26 Island";
+  let id = "test id";
+  let deck = Deck::from_goldfish_block(String::from(id), String::from(deck_text));
+
+  assert_eq!(deck.to_hash(), "D0DFF733D658");
 }
