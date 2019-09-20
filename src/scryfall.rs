@@ -72,13 +72,7 @@ fn get_price(data: &ScryfallData) -> Option<Cents> {
   let foil_price =  get_foil_price(data);
 
   match (nonfoil_price, foil_price) {
-    (Some(nonfoil), Some(foil)) => {
-      if nonfoil > foil {
-        Some(foil)
-      } else {
-        Some(nonfoil)
-      }
-    },
+    (Some(nonfoil), Some(foil)) => Some(std::cmp::min(nonfoil, foil)),
     (Some(nonfoil), None) => Some(nonfoil),
     (None, Some(foil)) => Some(foil),
     _ => None
