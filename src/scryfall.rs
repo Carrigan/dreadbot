@@ -17,7 +17,8 @@ pub struct ScryfallData {
 
 #[derive(Deserialize, Debug)]
 pub struct ScryfallPrices {
-  pub usd: Option<String>
+  pub usd: Option<String>,
+  pub usd_foil: Option<String>
 }
 
 #[derive(Debug)]
@@ -38,18 +39,59 @@ fn format_scryfall_param(card: &Card) -> String {
   format!("!\"{}\"", card.name)
 }
 
-fn reduce_pricing(entries: Vec<ScryfallData>) -> Vec<PricingSource> {
-  let mut prices: Vec<PricingSource> = Vec::new();
-
-  for entry in entries {
-    let str_price = match &entry.prices.usd {
+fn get_nonfoil_price(data: &ScryfallData) -> Option<Cents> {
+    let str_price = match &data.prices.usd {
       Some(price) => price,
-      None => continue
+      None => return None
     };
 
     let price = match str_price.parse::<f32>() {
       Ok(p32) => (p32 * 100f32) as Cents,
-      _ => continue
+      _ => return None
+    };
+
+    Some(price)
+}
+
+fn get_foil_price(data: &ScryfallData) -> Option<Cents> {
+    let str_price = match &data.prices.usd_foil {
+      Some(price) => price,
+      None => return None
+    };
+
+    let price = match str_price.parse::<f32>() {
+      Ok(p32) => (p32 * 100f32) as Cents,
+      _ => return None
+    };
+
+    Some(price)
+}
+
+fn get_price(data: &ScryfallData) -> Option<Cents> {
+  let nonfoil_price = get_nonfoil_price(data);
+  let foil_price =  get_foil_price(data);
+
+  match (nonfoil_price, foil_price) {
+    (Some(nonfoil), Some(foil)) => {
+      if nonfoil > foil {
+        Some(foil)
+      } else {
+        Some(nonfoil)
+      }
+    },
+    (Some(nonfoil), None) => Some(nonfoil),
+    (None, Some(foil)) => Some(foil),
+    _ => None
+  }
+}
+
+fn reduce_pricing(entries: Vec<ScryfallData>) -> Vec<PricingSource> {
+  let mut prices: Vec<PricingSource> = Vec::new();
+
+  for entry in entries {
+    let price = match get_price(&entry) {
+      Some(price) => price,
+      None => continue
     };
 
     let previous_entry = prices.iter_mut().find(|ps| ps.name == entry.name);
@@ -95,7 +137,7 @@ pub fn request_pricing(deck: &Deck) -> Result<Vec<PricingSource>, Box<dyn std::e
 
   // Build the initial query
   let query =
-    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:digital -border:gold usd>0 ({})", name_params)
+    format!("https://api.scryfall.com/cards/search?unique=prints&q=-is:oversized -is:digital -border:gold usd>0 ({})", name_params)
       .replace(" ", "%20")
       .replace("\"", "%22");
 
@@ -140,13 +182,13 @@ fn test_reduce_pricing() {
   let mut scryfall_mock: Vec<ScryfallData> = Vec::new();
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("1.00")) }});
+    prices: ScryfallPrices { usd: Some(String::from("1.00")), usd_foil: Some(String::from("10.00")) }});
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("0.50")) }});
+    prices: ScryfallPrices { usd: Some(String::from("0.50")), usd_foil: Some(String::from("10.00")) }});
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("2.00")) }});
+    prices: ScryfallPrices { usd: Some(String::from("2.00")), usd_foil: Some(String::from("10.00")) }});
 
   let reduced_prices = reduce_pricing(scryfall_mock);
   assert_eq!(reduced_prices.len(), 1);
