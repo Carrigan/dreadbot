@@ -12,7 +12,13 @@ pub struct ScryfallResponse {
 #[derive(Deserialize, Debug)]
 pub struct ScryfallData {
   pub name: String,
-  pub prices: ScryfallPrices
+  pub prices: ScryfallPrices,
+  pub card_faces: Option<Vec<ScryfallCardFaces>>
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ScryfallCardFaces {
+  pub name: String
 }
 
 #[derive(Deserialize, Debug)]
@@ -24,7 +30,8 @@ pub struct ScryfallPrices {
 #[derive(Debug)]
 pub struct PricingSource {
   pub name: String,
-  pub price: Cents
+  pub price: Cents,
+  pub front_name: String
 }
 
 const BASIC_LAND_NAMES: &'static [&'static str] = &[
@@ -98,7 +105,14 @@ fn reduce_pricing(entries: Vec<ScryfallData>) -> Vec<PricingSource> {
 
     // Otherwise add it
     } else {
-      prices.push(PricingSource { name: entry.name, price: price });
+      // For double sided cards, we need to save their front name for goldfish
+      let front_name = if let Some(faces) = entry.card_faces {
+        faces.get(0).unwrap().name.clone()
+      } else {
+        entry.name.clone()
+      };
+
+      prices.push(PricingSource { name: entry.name, price: price, front_name: front_name });
     }
   }
 
@@ -174,23 +188,39 @@ fn test_api_call() {
 #[test]
 fn test_reduce_pricing() {
   let mut scryfall_mock: Vec<ScryfallData> = Vec::new();
+
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("1.00")), usd_foil: Some(String::from("10.00")) }});
+    card_faces: None,
+    prices: ScryfallPrices {
+      usd: Some(String::from("1.00")),
+      usd_foil: Some(String::from("10.00"))
+    }
+  });
+
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("0.50")), usd_foil: Some(String::from("10.00")) }});
+    card_faces: None,
+    prices: ScryfallPrices {
+      usd: Some(String::from("0.50")),
+      usd_foil: Some(String::from("10.00"))
+    }
+  });
+
   scryfall_mock.push(ScryfallData{
     name: String::from("Island"),
-    prices: ScryfallPrices { usd: Some(String::from("2.00")), usd_foil: Some(String::from("10.00")) }});
+    card_faces: None,
+    prices: ScryfallPrices {
+      usd: Some(String::from("2.00")),
+      usd_foil: Some(String::from("10.00"))
+    }
+  });
 
   let reduced_prices = reduce_pricing(scryfall_mock);
   assert_eq!(reduced_prices.len(), 1);
   assert_eq!(reduced_prices.get(0).unwrap().name, "Island");
   assert_eq!(reduced_prices.get(0).unwrap().price, 50 as Cents);
 }
-
-
 
 #[test]
 fn test_multiple_requests() {
@@ -202,4 +232,15 @@ fn test_multiple_requests() {
   println!("{:?}", scryfall_resp);
 
   assert_eq!(scryfall_resp.len(), 16);
+}
+
+#[test]
+fn test_double_sided_card_requests() {
+  let block: String = String::from("1 Delver of Secrets");
+  let deck = Deck::from_goldfish_block(String::from("10108"), block);
+
+  let scryfall_resp = request_pricing(&deck).unwrap();
+
+  assert_eq!(scryfall_resp.get(0).unwrap().name, "Delver of Secrets // Insectile Aberration");
+  assert_eq!(scryfall_resp.get(0).unwrap().front_name, "Delver of Secrets");
 }

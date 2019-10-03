@@ -35,7 +35,7 @@ impl Deck {
   }
 
   fn update_card_pricing(card: &mut Card, entry: &PricingSource) {
-    if card.name == entry.name {
+    if card.name == entry.front_name || card.name == entry.name {
       card.price = Some(entry.price);
     }
   }
@@ -182,10 +182,11 @@ fn test_pricing_update() {
   let deck_text = "10 Island\r\n4 Treasure Hunt";
   let id = "test id";
   let mut deck = Deck::from_goldfish_block(String::from(id), String::from(deck_text));
-  let mut scryfall_entries: Vec<PricingSource> = Vec::new();
 
+  let mut scryfall_entries: Vec<PricingSource> = Vec::new();
   scryfall_entries.push(PricingSource {
     name: String::from("Island"),
+    front_name: String::from("Island"),
     price: 100
   });
 
