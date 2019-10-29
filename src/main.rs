@@ -14,6 +14,7 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
+use lazy_static::lazy_static;
 
 const MAINDECK_LIMIT: Cents = 20_00;
 const SIDEBOARD_LIMIT: Cents = 5_00;
@@ -31,6 +32,12 @@ $$info <url>   - Receive an itemized list of prices for a deck.
                  The response is lengthy so try to keep this to PMs.
 ```
 ";
+lazy_static! {
+    static ref PREFIX_REGEX: Regex = Regex::new(DREADBOT_PREFIX).unwrap();
+    static ref INFO_REGEX: Regex = Regex::new(r"^info https://www\.mtggoldfish\.com/deck/(\d*).*$").unwrap();
+    static ref HASH_REGEX: Regex = Regex::new(r"^hash https://www\.mtggoldfish\.com/deck/(\d*).*$").unwrap();
+    static ref VERIFY_REGEX: Regex = Regex::new(r"^verify https://www\.mtggoldfish\.com/deck/(\d*).*$").unwrap();
+}
 
 struct Handler;
 
@@ -93,7 +100,7 @@ fn respond_to_deck(ctx: &Context, msg: &Message, deck: &Deck) -> bool {
     respond(ctx, &msg, &response)
 }
 
-fn retrieve_or_error(ctx: &Context, msg: &Message, regex: Regex, parsed_message: &str) -> Option<Deck> {
+fn retrieve_or_error(ctx: &Context, msg: &Message, regex: &Regex, parsed_message: &str) -> Option<Deck> {
     let captures = match regex.captures(parsed_message) {
         Some(c) => c,
         None => return None
@@ -118,11 +125,8 @@ fn dreadbot_help(ctx: &Context, msg: &Message) -> bool {
 }
 
 fn dreadbot_verify(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
-    let regex =
-        Regex::new(r"^verify https://www\.mtggoldfish\.com/deck/(\d*).*$")
-            .unwrap();
 
-    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, &VERIFY_REGEX, parsed_message) {
         return respond_to_deck(ctx, &msg, &deck);
     }
 
@@ -130,11 +134,8 @@ fn dreadbot_verify(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
 }
 
 fn dreadbot_info(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
-    let regex =
-        Regex::new(r"^info https://www\.mtggoldfish\.com/deck/(\d*).*$")
-            .unwrap();
 
-    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, &INFO_REGEX, parsed_message) {
         return respond(ctx, &msg, &deck.info_string());
     }
 
@@ -142,11 +143,8 @@ fn dreadbot_info(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
 }
 
 fn dreadbot_hash(ctx: &Context, msg: &Message, parsed_message: &str) -> bool {
-    let regex =
-        Regex::new(r"^hash https://www\.mtggoldfish\.com/deck/(\d*).*$")
-            .unwrap();
 
-    if let Some(deck) = retrieve_or_error(&ctx, &msg, regex, parsed_message) {
+    if let Some(deck) = retrieve_or_error(&ctx, &msg, &HASH_REGEX, parsed_message) {
         return respond(ctx, &msg, &format!("Deck hash: {}", &deck.to_hash()));
     }
 
